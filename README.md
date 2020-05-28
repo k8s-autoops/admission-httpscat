@@ -6,7 +6,7 @@ a HTTP debug service, prints details of request and returns pre-defined response
 
 ## Get
 
-`guoyk/httpcat`
+`docker pull guoyk/httpcat`
 
 ## Env
 
