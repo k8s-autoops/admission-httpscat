@@ -11,9 +11,9 @@ a HTTP debug service, prints details of request and returns pre-defined response
 ## Env
 
 * `PORT` port to listen, default to `80`
-* `RESPONSE` response body, default to `OK`
-* `RESPONSE_TYPE` response content type, default to `text/plain; charset=utf-8`
 * `RESPONSE_CODE` response code, default to `200`
+* `RESPONSE_TYPE` response content type, default to `text/plain; charset=utf-8`
+* `RESPONSE_BODY` response body, default to `OK`
 
 ## Credits
 

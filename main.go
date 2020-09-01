@@ -14,7 +14,7 @@ import (
 
 var (
 	optPort         string
-	optResponse     []byte
+	optResponseBody []byte
 	optResponseType string
 	optResponseCode int
 )
@@ -24,9 +24,9 @@ func init() {
 	if optPort == "" {
 		optPort = "80"
 	}
-	optResponse = []byte(os.Getenv("RESPONSE"))
-	if len(optResponse) == 0 {
-		optResponse = []byte("OK")
+	optResponseBody = []byte(os.Getenv("RESPONSE_BODY"))
+	if len(optResponseBody) == 0 {
+		optResponseBody = []byte("OK")
 	}
 	optResponseType = os.Getenv("RESPONSE_TYPE")
 	if optResponseType == "" {
@@ -58,6 +58,8 @@ func main() {
 		log.Printf("%s %s %s", req.Proto, req.Method, req.URL.String())
 		// headers
 		log.Println("")
+		// fix for golang Host header
+		log.Printf("Host: %s", req.Host)
 		for k, vs := range req.Header {
 			for _, v := range vs {
 				log.Printf("%s: %s", k, v)
@@ -81,9 +83,9 @@ func main() {
 
 		// response with OK
 		rw.Header().Set("Content-Type", optResponseType)
-		rw.Header().Set("Content-Length", strconv.Itoa(len(optResponse)))
+		rw.Header().Set("Content-Length", strconv.Itoa(len(optResponseBody)))
 		rw.WriteHeader(optResponseCode)
-		_, _ = rw.Write(optResponse)
+		_, _ = rw.Write(optResponseBody)
 	})
 
 	log.Printf("listening at %s", optPort)
