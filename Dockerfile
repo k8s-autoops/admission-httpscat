@@ -1,9 +1,10 @@
-FROM golang:1.13 AS builder
+FROM golang:1.14 AS builder
+ENV GOPROXY https://goproxy.io
 ENV CGO_ENABLED 0
 WORKDIR /go/src/app
 ADD . .
-RUN go build -o /httpcat
+RUN go build -o /admission-httpscat
 
-FROM scratch
-COPY --from=builder /httpcat /httpcat
-CMD ["/httpcat"]
+FROM alpine:3.12
+COPY --from=builder /admission-httpscat /admission-httpscat
+CMD ["/admission-httpscat"]

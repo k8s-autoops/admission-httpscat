@@ -1,19 +1,8 @@
-# httpcat
+# admission-httpscat
 
-[![BMC Donate](https://img.shields.io/badge/BMC-Donate-orange)](https://www.buymeacoffee.com/vFa5wfRq6)
+Debug server for kubernetes admission webhook
 
-a HTTP debug service, prints details of request and returns pre-defined response
-
-## Get
-
-`docker pull guoyk/httpcat`
-
-## Env
-
-* `PORT` port to listen, default to `80`
-* `RESPONSE_CODE` response code, default to `200`
-* `RESPONSE_TYPE` response content type, default to `text/plain; charset=utf-8`
-* `RESPONSE_BODY` response body, default to `OK`
+listening at `443`, using certificates from `/autoops-data/tls/tls.crt` and `/autoops-data/tls/tls.key`
 
 ## Credits
 

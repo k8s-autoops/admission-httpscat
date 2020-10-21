@@ -13,30 +13,14 @@ import (
 )
 
 var (
-	optPort         string
-	optResponseBody []byte
-	optResponseType string
-	optResponseCode int
+	responseBody = []byte("OK")
+	responseType = "text/plain; charset=utf-8"
 )
 
-func init() {
-	optPort = os.Getenv("PORT")
-	if optPort == "" {
-		optPort = "80"
-	}
-	optResponseBody = []byte(os.Getenv("RESPONSE_BODY"))
-	if len(optResponseBody) == 0 {
-		optResponseBody = []byte("OK")
-	}
-	optResponseType = os.Getenv("RESPONSE_TYPE")
-	if optResponseType == "" {
-		optResponseType = "text/plain; charset=utf-8"
-	}
-	optResponseCode, _ = strconv.Atoi(os.Getenv("RESPONSE_CODE"))
-	if optResponseCode == 0 {
-		optResponseCode = http.StatusOK
-	}
-}
+const (
+	certFile = "/autoops-data/tls/tls.crt"
+	keyFile  = "/autoops-data/tls/tls.key"
+)
 
 func main() {
 	log.SetFlags(0)
@@ -82,12 +66,12 @@ func main() {
 		log.Println(endLine.String())
 
 		// response with OK
-		rw.Header().Set("Content-Type", optResponseType)
-		rw.Header().Set("Content-Length", strconv.Itoa(len(optResponseBody)))
-		rw.WriteHeader(optResponseCode)
-		_, _ = rw.Write(optResponseBody)
+		rw.Header().Set("Content-Type", responseType)
+		rw.Header().Set("Content-Length", strconv.Itoa(len(responseBody)))
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write(responseBody)
 	})
 
-	log.Printf("listening at %s", optPort)
-	log.Fatal(http.ListenAndServe(":"+optPort, nil))
+	log.Println("listening at :443")
+	log.Fatal(http.ListenAndServeTLS(":443", certFile, keyFile, nil))
 }
