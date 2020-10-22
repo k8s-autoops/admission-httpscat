@@ -1,14 +1,18 @@
 package main
 
 import (
-	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
+	v1 "k8s.io/api/admission/v1"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -22,56 +26,90 @@ const (
 	keyFile  = "/autoops-data/tls/tls.key"
 )
 
+func exit(err *error) {
+	if *err != nil {
+		log.Println("exited with error:", (*err).Error())
+		os.Exit(1)
+	} else {
+		log.Println("exited")
+	}
+}
+
 func main() {
+	var err error
+	defer exit(&err)
+
 	log.SetFlags(0)
 	log.SetOutput(os.Stdout)
 
-	count := uint64(0)
-	locker := &sync.Mutex{}
+	requestID := uint64(0)
+	requestLocker := &sync.Mutex{}
 
-	http.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-		locker.Lock()
-		defer locker.Unlock()
-		count++
-
-		// request id
-		title := fmt.Sprintf("================== %s ==== #%d ==================", time.Now().Format(time.RFC3339), count)
-		log.Printf(title)
-		// proto / method / url
-		log.Println("")
-		log.Printf("%s %s %s", req.Proto, req.Method, req.URL.String())
-		// headers
-		log.Println("")
-		// fix for golang Host header
-		log.Printf("Host: %s", req.Host)
-		for k, vs := range req.Header {
-			for _, v := range vs {
-				log.Printf("%s: %s", k, v)
+	s := &http.Server{
+		Addr: ":443",
+		Handler: http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			requestLocker.Lock()
+			defer requestLocker.Unlock()
+			requestID++
+			// line start / line end
+			lineStart := fmt.Sprintf("================== %s ==== #%d ==================", time.Now().Format(time.RFC3339), requestID)
+			log.Println(lineStart)
+			lineEnd := &strings.Builder{}
+			for range lineStart {
+				lineEnd.WriteRune('=')
 			}
-		}
-		// body
-		log.Println("")
-		br := bufio.NewReader(req.Body)
-		for {
-			line, err := br.ReadString('\n')
-			log.Println(line)
-			if err != nil {
-				break
+			defer log.Println(lineEnd.String())
+			// proto / method / url
+			log.Printf("\n%s %s %s", req.Proto, req.Method, req.URL.String())
+			// headers
+			log.Printf("\nHost: %s", req.Host)
+			for k, vs := range req.Header {
+				for _, v := range vs {
+					log.Printf("%s: %s", k, v)
+				}
 			}
-		}
-		endLine := &strings.Builder{}
-		for range title {
-			endLine.WriteRune('=')
-		}
-		log.Println(endLine.String())
 
-		// response with OK
-		rw.Header().Set("Content-Type", responseType)
-		rw.Header().Set("Content-Length", strconv.Itoa(len(responseBody)))
-		rw.WriteHeader(http.StatusOK)
-		_, _ = rw.Write(responseBody)
-	})
+			// response
+			var review v1.AdmissionReview
+			if err := json.NewDecoder(req.Body).Decode(&review); err != nil {
+				log.Println("Failed to decode a AdmissionReview:", err.Error())
+				http.Error(rw, err.Error(), http.StatusBadRequest)
+				return
+			}
 
-	log.Println("listening at :443")
-	log.Fatal(http.ListenAndServeTLS(":443", certFile, keyFile, nil))
+			reviewPretty, _ := json.MarshalIndent(&review, "", "  ")
+			log.Printf("%s", reviewPretty)
+
+			// response
+			review.Response = &v1.AdmissionResponse{
+				UID:     review.Request.UID,
+				Allowed: true,
+			}
+			review.Request = nil
+
+			reviewJSON, _ := json.Marshal(review)
+			rw.Header().Set("Content-Type", "application/json")
+			rw.Header().Set("Content-Length", strconv.Itoa(len(reviewJSON)))
+			_, _ = rw.Write(reviewJSON)
+		}),
+	}
+
+	// channels
+	chErr := make(chan error, 1)
+	chSig := make(chan os.Signal, 1)
+	signal.Notify(chSig, syscall.SIGTERM, syscall.SIGINT)
+
+	// start server
+	go func() {
+		log.Println("listening at :443")
+		chErr <- s.ListenAndServeTLS(certFile, keyFile)
+	}()
+
+	// wait signal or failed start
+	select {
+	case err = <-chErr:
+	case sig := <-chSig:
+		log.Println("signal caught:", sig.String())
+		_ = s.Shutdown(context.Background())
+	}
 }
